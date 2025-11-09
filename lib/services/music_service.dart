@@ -1,12 +1,14 @@
-import 'package:flutter/foundation.dart';
-import 'package:audioplayers/audioplayers.dart';
-import '../models/song.dart';
-import '../models/playlist.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'dart:io';
+
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
+
+import 'package:ffmpeg_kit_min_gpl/ffmpeg_kit.dart';
 import 'package:path_provider/path_provider.dart';
-import '../utils/constants.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
+
+import '../models/playlist.dart';
+import '../models/song.dart';
 
 class MusicService extends ChangeNotifier {
   static final MusicService _instance = MusicService._internal();
@@ -128,32 +130,120 @@ class MusicService extends ChangeNotifier {
   List<Song> songsInPlaylist(Playlist p) =>
       allSongs.where((s) => p.songIds.contains(s.id)).toList();
 
-  Future<void> downloadSong(Song song, {String apiUrl = serverApiUrl}) async {
+  Future<void> downloadSong(Song song) async {
     song.isDownloading = true;
+    song.downloadProgress = 0.0;
     notifyListeners();
 
     try {
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'youtube_url': song.youtubeUrl, 'song_id': song.id}),
-      );
+      final docsDir = await getApplicationDocumentsDirectory();
+      final outPath = '${docsDir.path}/${song.id}.mp3';
 
-      if (response.statusCode == 200) {
-        final mp3Url = jsonDecode(response.body)['mp3_url'];
-        final mp3Data = await http.get(Uri.parse(mp3Url));
-        final dir = await getApplicationDocumentsDirectory();
-        final file = File('${dir.path}/${song.id}.mp3');
-        await file.writeAsBytes(mp3Data.bodyBytes);
-        song.localPath = file.path;
+      if (File(outPath).existsSync()) {
+        song.localPath = outPath;
+        song.isDownloading = false;
+        song.downloadProgress = 1.0;
+        notifyListeners();
+        return;
       }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Download failed: $e');
+
+      final uri = Uri.parse(song.youtubeUrl);
+      late final String downloadedPath;
+
+      if (uri.host.contains('youtube.com') || uri.host.contains('youtu.be')) {
+        downloadedPath = await _downloadFromYoutube(song);
+      } else {
+        downloadedPath = await _downloadDirect(uri, song);
       }
-    } finally {
+
+      if (!File(downloadedPath).existsSync()) {
+        throw Exception('Failed to download source media.');
+      }
+
+      final cmd = '-y -i "$downloadedPath" -vn -acodec libmp3lame -b:a 192k "$outPath"';
+      final session = await FFmpegKit.execute(cmd);
+      final rc = await session.getReturnCode();
+      if (rc == null || !rc.isValueSuccess()) {
+        throw Exception('FFmpeg conversion failed (code: ${rc?.getValue()}).');
+      }
+
+      try {
+        File(downloadedPath).deleteSync();
+      } catch (_) {
+        // best-effort cleanup
+      }
+
+      song.localPath = outPath;
+      song.downloadProgress = 1.0;
       song.isDownloading = false;
       notifyListeners();
+    } catch (e) {
+      song.isDownloading = false;
+      song.downloadProgress = 0.0;
+      notifyListeners();
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('Download/convert error: $e');
+      }
     }
+  }
+
+  Future<String> _downloadFromYoutube(Song song) async {
+    final youtube = yt.YoutubeExplode();
+    try {
+      final videoId = yt.VideoId(song.youtubeUrl);
+      final manifest = await youtube.videos.streamsClient.getManifest(videoId);
+      final audioOnly = manifest.audioOnly;
+      if (audioOnly.isEmpty) {
+        throw Exception('No audio stream available for this URL.');
+      }
+      final bestAudio = audioOnly.withHighestBitrate();
+
+      final tmpDir = await getTemporaryDirectory();
+      final ext = bestAudio.container.name;
+      final tmpAudioPath = '${tmpDir.path}/${song.id}_audio.$ext';
+
+      final audioStream = youtube.videos.streamsClient.get(bestAudio);
+      final file = File(tmpAudioPath);
+      final sink = file.openWrite();
+      final total = bestAudio.size.totalBytes;
+      var received = 0;
+
+      await for (final data in audioStream) {
+        sink.add(data);
+        received += data.length;
+        if (total > 0) {
+          song.downloadProgress = received / total * 0.85;
+          notifyListeners();
+        }
+      }
+      await sink.close();
+      return tmpAudioPath;
+    } finally {
+      youtube.close();
+    }
+  }
+
+  Future<String> _downloadDirect(Uri uri, Song song) async {
+    final tmpDir = await getTemporaryDirectory();
+    final tmpVideoPath = '${tmpDir.path}/${song.id}_source';
+    final request = await HttpClient().getUrl(uri);
+    final response = await request.close();
+
+    final file = File(tmpVideoPath);
+    final sink = file.openWrite();
+    final total = response.contentLength;
+    var received = 0;
+
+    await for (final data in response) {
+      sink.add(data);
+      received += data.length;
+      if (total > 0) {
+        song.downloadProgress = received / total * 0.85;
+        notifyListeners();
+      }
+    }
+    await sink.close();
+    return tmpVideoPath;
   }
 }
