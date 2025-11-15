@@ -31,7 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final filtered = music.allSongs.where((s) {
       final q = query.toLowerCase();
-      return s.title.toLowerCase().contains(q) || s.artist.toLowerCase().contains(q);
+      return s.title.toLowerCase().contains(q) ||
+          s.artist.toLowerCase().contains(q);
     }).toList();
 
     return Scaffold(

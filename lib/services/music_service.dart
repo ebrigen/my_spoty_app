@@ -10,6 +10,10 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 
 import '../models/playlist.dart';
 import '../models/song.dart';
+import '../models/youtube_search_result.dart';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 
 const String backendBaseUrl = 'http://localhost:8000';
 
@@ -82,6 +86,26 @@ class MusicService extends ChangeNotifier {
         next();
       }
     });
+  }
+
+  Future<List<YoutubeSearchResult>> searchOnYoutube(String query) async {
+    final uri = Uri.parse(
+        '$backendBaseUrl/search?q=${Uri.encodeQueryComponent(query)}');
+    _log('Calling backend search: $uri');
+
+    final resp = await http.get(uri);
+    if (resp.statusCode != 200) {
+      _log('Search error: statusCode=${resp.statusCode}, body=${resp.body}');
+      throw Exception('Search failed: ${resp.statusCode}');
+    }
+
+    final List<dynamic> data = jsonDecode(resp.body) as List<dynamic>;
+    final results = data
+        .map((e) => YoutubeSearchResult.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    _log('Search returned ${results.length} results');
+    return results;
   }
 
   Future<void> playSong(Song song) async {
