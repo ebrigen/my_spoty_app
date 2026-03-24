@@ -25,23 +25,20 @@ class MusicService extends ChangeNotifier {
     _log('MusicService initialized, seeding demo songs');
     allSongs.addAll([
       Song(
-        id: '1',
-        title: 'Lush Life',
-        artist: 'Zara Larsson',
-        youtubeUrl: 'https://www.youtube.com/watch?v=tD4HCZe-tew',
-      ),
+          id: '1',
+          title: 'Lush Life',
+          artist: 'Zara Larsson',
+          youtubeUrl: 'https://www.youtube.com/watch?v=tD4HCZe-tew'),
       Song(
-        id: '2',
-        title: 'Faded',
-        artist: 'Alan Walker',
-        youtubeUrl: 'https://www.youtube.com/watch?v=60ItHLz5WEA',
-      ),
+          id: '2',
+          title: 'Faded',
+          artist: 'Alan Walker',
+          youtubeUrl: 'https://www.youtube.com/watch?v=60ItHLz5WEA'),
       Song(
-        id: '3',
-        title: 'Believer',
-        artist: 'Imagine Dragons',
-        youtubeUrl: 'https://www.youtube.com/watch?v=7wtfhZwyrcc',
-      ),
+          id: '3',
+          title: 'Believer',
+          artist: 'Imagine Dragons',
+          youtubeUrl: 'https://www.youtube.com/watch?v=7wtfhZwyrcc'),
     ]);
   }
 
@@ -64,13 +61,11 @@ class MusicService extends ChangeNotifier {
   Duration position = Duration.zero;
   Duration duration = Duration.zero;
 
-  // ---------------------------------------------------------------------------
-  // AUDIO LISTENERS
-  // ---------------------------------------------------------------------------
   void attachAudioListeners() {
     _log('Attaching audio listeners');
     _audioPlayer.onPositionChanged.listen((p) {
       position = p;
+      // Avoid spamming logs: log only occasionally
       if (p.inSeconds % 5 == 0) {
         _log('Position changed: ${p.inSeconds}s');
       }
@@ -93,9 +88,6 @@ class MusicService extends ChangeNotifier {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // YOUTUBE SEARCH VIA BACKEND
-  // ---------------------------------------------------------------------------
   Future<List<YoutubeSearchResult>> searchOnYoutube(String query) async {
     final uri = Uri.parse(
         '$backendBaseUrl/search?q=${Uri.encodeQueryComponent(query)}');
@@ -116,13 +108,9 @@ class MusicService extends ChangeNotifier {
     return results;
   }
 
-  // ---------------------------------------------------------------------------
-  // PLAYBACK
-  // ---------------------------------------------------------------------------
   Future<void> playSong(Song song) async {
     _log(
-      'playSong called for "${song.title}" (id=${song.id}), localPath=${song.localPath}',
-    );
+        'playSong called for "${song.title}" (id=${song.id}), localPath=${song.localPath}');
     if (song.localPath == null) {
       _log('Cannot play song, localPath is null');
       return;
@@ -193,9 +181,6 @@ class MusicService extends ChangeNotifier {
     playSong(queue[prevIdx]);
   }
 
-  // ---------------------------------------------------------------------------
-  // FAVORITES / PLAYLISTS
-  // ---------------------------------------------------------------------------
   void toggleFavorite(Song song) {
     song.isFavorite = !song.isFavorite;
     _log('Favorite toggled for "${song.title}": ${song.isFavorite}');
@@ -251,9 +236,6 @@ class MusicService extends ChangeNotifier {
   List<Song> songsInPlaylist(Playlist p) =>
       allSongs.where((s) => p.songIds.contains(s.id)).toList();
 
-  // ---------------------------------------------------------------------------
-  // DOWNLOAD (BACKEND)
-  // ---------------------------------------------------------------------------
   Future<void> downloadSong(Song song) async {
     _log('downloadSong called for "${song.title}" (id=${song.id})');
     song.isDownloading = true;
@@ -261,6 +243,8 @@ class MusicService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      //final docsDir = await getApplicationDocumentsDirectory();
+      //final outPath = '${docsDir.path}/${song.id}.mp3';
       final songsDir = await _getSongsDirectory();
       final outPath = '${songsDir.path}/${song.id}.mp3';
 
@@ -273,7 +257,7 @@ class MusicService extends ChangeNotifier {
         return;
       }
 
-      // 👉 estrai videoId da YouTube URL
+      // 👉 invece di _downloadFromYoutube:
       final videoId = Uri.parse(song.youtubeUrl).queryParameters['v'] ?? '';
       if (videoId.isEmpty) {
         throw Exception('Invalid YouTube URL: missing video id');
@@ -290,24 +274,20 @@ class MusicService extends ChangeNotifier {
       song.isDownloading = false;
       song.downloadProgress = 0.0;
       notifyListeners();
-      await saveState();
       _log('Download error (backend): $e');
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // DOWNLOAD (YOUTUBE DIRECT + FFMPEG)
-  // ---------------------------------------------------------------------------
   Future<void> downloadSongYouTube(Song song) async {
-    _log('downloadSongYouTube called for "${song.title}" (id=${song.id})');
+    _log('downloadSong called for "${song.title}" (id=${song.id})');
     song.isDownloading = true;
     song.downloadProgress = 0.0;
     notifyListeners();
 
     try {
-      final songsDir = await _getSongsDirectory();
-      _log('Songs directory: ${songsDir.path}');
-      final outPath = '${songsDir.path}/${song.id}.mp3';
+      final docsDir = await getApplicationDocumentsDirectory();
+      _log('ApplicationDocumentsDirectory: ${docsDir.path}');
+      final outPath = '${docsDir.path}/${song.id}.mp3';
       _log('Target mp3 path: $outPath');
 
       if (File(outPath).existsSync()) {
@@ -333,14 +313,11 @@ class MusicService extends ChangeNotifier {
       }
 
       _log(
-        'Download finished, path: $downloadedPath, '
-        'exists=${File(downloadedPath).existsSync()}',
-      );
+          'Download finished, path: $downloadedPath, exists=${File(downloadedPath).existsSync()}');
 
       if (!File(downloadedPath).existsSync()) {
         throw Exception(
-          'Failed to download source media (file does not exist).',
-        );
+            'Failed to download source media (file does not exist).');
       }
 
       final cmd =
@@ -363,9 +340,7 @@ class MusicService extends ChangeNotifier {
       song.localPath = outPath;
       song.downloadProgress = 1.0;
       song.isDownloading = false;
-      _log(
-        'Download + conversion completed successfully for "${song.title}"',
-      );
+      _log('Download + conversion completed successfully for "${song.title}"');
       notifyListeners();
     } catch (e) {
       song.isDownloading = false;
@@ -379,8 +354,8 @@ class MusicService extends ChangeNotifier {
     final uri = Uri.parse('$backendBaseUrl/download/$videoId');
     _log('_downloadFromBackend: GET $uri');
 
-    final songsDir = await _getSongsDirectory();
-    final outPath = '${songsDir.path}/${song.id}.mp3';
+    final docsDir = await getApplicationDocumentsDirectory();
+    final outPath = '${docsDir.path}/${song.id}.mp3';
 
     final request = await HttpClient().getUrl(uri);
     final response = await request.close();
@@ -410,13 +385,9 @@ class MusicService extends ChangeNotifier {
     return outPath;
   }
 
-  // ---------------------------------------------------------------------------
-  // YOUTUBE + DIRECT DOWNLOAD HELPERS
-  // ---------------------------------------------------------------------------
   Future<String> _downloadFromYoutube(Song song) async {
     _log(
-      '_downloadFromYoutube started for "${song.title}" (${song.youtubeUrl})',
-    );
+        '_downloadFromYoutube started for "${song.title}" (${song.youtubeUrl})');
     final youtube = yt.YoutubeExplode();
     try {
       final videoId = yt.VideoId(song.youtubeUrl);
@@ -424,14 +395,14 @@ class MusicService extends ChangeNotifier {
 
       final manifest = await youtube.videos.streamsClient.getManifest(videoId);
       _log(
-        'Got manifest. AudioOnly streams count: ${manifest.audioOnly.length}',
-      );
+          'Got manifest. AudioOnly streams count: ${manifest.audioOnly.length}');
 
       final audioOnly = manifest.audioOnly;
       if (audioOnly.isEmpty) {
         throw Exception('No audio stream available for this URL.');
       }
 
+      // ✅ Prova prima a prendere un m4a (mp4a) se esiste, altrimenti il primo disponibile
       yt.AudioOnlyStreamInfo bestAudio;
       final m4aCandidates = audioOnly.where(
         (s) => s.audioCodec.toLowerCase().contains('mp4a'),
@@ -441,6 +412,7 @@ class MusicService extends ChangeNotifier {
           (a, b) => a.bitrate.bitsPerSecond >= b.bitrate.bitsPerSecond ? a : b,
         );
       } else {
+        // fallback: il migliore in generale
         bestAudio = audioOnly.withHighestBitrate();
       }
 
@@ -462,12 +434,12 @@ class MusicService extends ChangeNotifier {
 
       final rawStream = youtube.videos.streamsClient.get(bestAudio);
 
+      // ⏱ Timeout di 20 secondi se non arrivano dati
       final timedStream = rawStream.timeout(
         const Duration(seconds: 20),
         onTimeout: (sink) {
           _log(
-            'Timeout while downloading audio stream (no data received for 20s)',
-          );
+              'Timeout while downloading audio stream (no data received for 20s)');
           sink.close();
         },
       );
@@ -512,8 +484,7 @@ class MusicService extends ChangeNotifier {
 
         if (received == 0) {
           throw Exception(
-            'No data received from audio stream (received=0 bytes)',
-          );
+              'No data received from audio stream (received=0 bytes)');
         }
 
         _log('YouTube audio download completed. Saved to $tmpAudioPath');
@@ -551,9 +522,7 @@ class MusicService extends ChangeNotifier {
       _log('HTTP GET sent');
       final response = await request.close();
       _log(
-        'HTTP response status: ${response.statusCode}, '
-        'contentLength: ${response.contentLength}',
-      );
+          'HTTP response status: ${response.statusCode}, contentLength: ${response.contentLength}');
 
       final file = File(tmpVideoPath);
       final sink = file.openWrite();
@@ -569,6 +538,7 @@ class MusicService extends ChangeNotifier {
           song.downloadProgress = progress * 0.85;
           notifyListeners();
 
+          // Log every 10%
           final percent = (progress * 100).floor();
           if (percent ~/ 10 != lastLoggedPercent ~/ 10) {
             lastLoggedPercent = percent;
@@ -585,163 +555,12 @@ class MusicService extends ChangeNotifier {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // PERSISTENT SONGS DIRECTORY + RESTORE
-  // ---------------------------------------------------------------------------
   Future<Directory> _getSongsDirectory() async {
     final docsDir = await getApplicationDocumentsDirectory();
     final songsDir = Directory('${docsDir.path}/songs');
     if (!songsDir.existsSync()) {
       songsDir.createSync(recursive: true);
-      _log('Created songs directory at: ${songsDir.path}');
     }
     return songsDir;
-  }
-
-  /// Da chiamare una volta all'avvio dell'app
-  Future<void> restoreDownloadedSongs() async {
-    _log('restoreDownloadedSongs() called');
-
-    final songsDir = await _getSongsDirectory();
-    if (!songsDir.existsSync()) {
-      _log('Songs directory does not exist yet, nothing to restore');
-      return;
-    }
-
-    final entities = songsDir.listSync();
-    _log('Found ${entities.length} entries in songs directory');
-
-    for (final entity in entities) {
-      if (entity is! File) continue;
-      if (!entity.path.endsWith('.mp3')) continue;
-
-      final fileName = entity.uri.pathSegments.last; // es: "1.mp3"
-      final songId = fileName.substring(0, fileName.length - 4); // "1"
-
-      try {
-        final song = allSongs.firstWhere((s) => s.id == songId);
-        song.localPath = entity.path;
-        song.downloadProgress = 1.0;
-        song.isDownloading = false;
-        _log('Restored localPath for song "${song.title}" (id=$songId)');
-      } catch (_) {
-        _log(
-          'No Song in allSongs for file "$fileName" (id=$songId) – skipping',
-        );
-      }
-    }
-
-    notifyListeners();
-  }
-
-  Future<File> _getStateFile() async {
-    final docsDir = await getApplicationDocumentsDirectory();
-    return File('${docsDir.path}/music_state.json');
-  }
-
-  Map<String, dynamic> _playlistToJson(Playlist p) {
-    return {
-      'id': p.id,
-      'name': p.name,
-      'songIds': p.songIds,
-      'icon': p.icon,
-    };
-  }
-
-  Playlist _playlistFromJson(Map<String, dynamic> json) {
-    return Playlist(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      songIds: List<String>.from(json['songIds'] as List<dynamic>),
-      icon: json['icon'] as String? ?? '🎵',
-    );
-  }
-
-  Song _songFromJson(Map<String, dynamic> json) {
-    return Song(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      artist: json['artist'] as String,
-      youtubeUrl: json['youtubeUrl'] as String,
-      localPath: json['localPath'] as String?,
-      isDownloading: json['isDownloading'] as bool? ?? false,
-      downloadProgress: (json['downloadProgress'] as num?)?.toDouble() ?? 0.0,
-      isFavorite: json['isFavorite'] as bool? ?? false,
-    );
-  }
-
-  Map<String, dynamic> _songToJson(Song s) {
-    return {
-      'id': s.id,
-      'title': s.title,
-      'artist': s.artist,
-      'youtubeUrl': s.youtubeUrl,
-      'localPath': s.localPath,
-      'isDownloading': s.isDownloading,
-      'downloadProgress': s.downloadProgress,
-      'isFavorite': s.isFavorite,
-    };
-  }
-
-  // ---- SALVA STATO SU DISCO ----
-  Future<void> saveState() async {
-    try {
-      final file = await _getStateFile();
-      final data = {
-        'songs': allSongs.map(_songToJson).toList(),
-        'playlists': playlists.map(_playlistToJson).toList(),
-      };
-      await file.writeAsString(jsonEncode(data), flush: true);
-      _log('State saved to ${file.path}');
-    } catch (e) {
-      _log('Error saving state: $e');
-    }
-  }
-
-  // ---- CARICA STATO DA DISCO ----
-  Future<void> loadState() async {
-    try {
-      final file = await _getStateFile();
-      if (!file.existsSync()) {
-        _log('State file does not exist, keeping demo songs');
-        // ma riallineiamo gli mp3 eventualmente già esistenti
-        await restoreDownloadedSongs();
-        return;
-      }
-
-      final text = await file.readAsString();
-      final decoded = jsonDecode(text) as Map<String, dynamic>;
-
-      final songsJson = (decoded['songs'] as List<dynamic>? ?? []);
-      final playlistsJson = (decoded['playlists'] as List<dynamic>? ?? []);
-
-      allSongs
-        ..clear()
-        ..addAll(
-          songsJson
-              .map((e) => _songFromJson(e as Map<String, dynamic>))
-              .toList(),
-        );
-
-      playlists
-        ..clear()
-        ..addAll(
-          playlistsJson
-              .map((e) => _playlistFromJson(e as Map<String, dynamic>))
-              .toList(),
-        );
-
-      _log(
-        'State loaded: ${allSongs.length} songs, '
-        '${playlists.length} playlists',
-      );
-
-      // Assicuriamoci che localPath punti solo a file che esistono davvero
-      await restoreDownloadedSongs();
-
-      notifyListeners();
-    } catch (e) {
-      _log('Error loading state: $e');
-    }
   }
 }

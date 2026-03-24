@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/playlists_screen.dart';
 import 'screens/favorites_screen.dart';
+import 'screens/youtube_search_pagestate.dart';
 import 'widgets/now_playing_bar.dart';
 
 class MusicApp extends StatelessWidget {
@@ -31,6 +32,7 @@ class _MainScreenState extends State<MainScreen> {
     HomeScreen(),
     PlaylistsScreen(),
     FavoritesScreen(),
+    YoutubeSearchPage(),
   ];
 
   @override
@@ -39,11 +41,25 @@ class _MainScreenState extends State<MainScreen> {
       body: _screens[_selectedIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) =>
+            setState(() => _selectedIndex = index),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.playlist_play_outlined), selectedIcon: Icon(Icons.playlist_play), label: 'Playlists'),
-          NavigationDestination(icon: Icon(Icons.favorite_border), selectedIcon: Icon(Icons.favorite), label: 'Favorites'),
+          NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home'),
+          NavigationDestination(
+              icon: Icon(Icons.playlist_play_outlined),
+              selectedIcon: Icon(Icons.playlist_play),
+              label: 'Playlists'),
+          NavigationDestination(
+              icon: Icon(Icons.favorite_border),
+              selectedIcon: Icon(Icons.favorite),
+              label: 'Favorites'),
+          NavigationDestination(
+              icon: Icon(Icons.search),
+              selectedIcon: Icon(Icons.favorite),
+              label: 'Search'),
         ],
       ),
       bottomSheet: const NowPlayingBar(),
